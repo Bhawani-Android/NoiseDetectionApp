@@ -1,0 +1,15 @@
+package com.example.recording
+
+import com.example.domain.entity.AudioEntity
+
+data class RecordingUiState(
+    val isRecording: Boolean = false,
+    val currentDb: Double = 0.0,
+    val hasNoiseWarning: Boolean = false,
+    val recordedAudio: AudioEntity? = null,
+    val isPlaying: Boolean = false,
+    val errorMessage: String? = null,
+    // Additional fields for playback progress:
+    val currentPositionMs: Long = 0L,
+    val totalDurationMs: Long = 0L
+)
