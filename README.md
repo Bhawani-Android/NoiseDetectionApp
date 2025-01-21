@@ -2,7 +2,7 @@
 
 A mobile application for audio recording with built-in noise detection, noise reduction, and playback capabilities. The project uses Jetpack Compose for UI, Hilt for dependency injection, and a multimodular clean architecture approach. It stores recorded files in a Room database and uses an approximate 5MB file-size limit and 1 minute time limit for recordings.
 
-Architecture
+# Architecture
 The project follows a Clean Architecture and multimodule design:
 
 App module (entry point): sets up Hilt, hosts the Compose UI.
@@ -11,23 +11,26 @@ Data module: implements repository interfaces using Room (for storage) and Audio
 Core or Feature modules (optional separation): utility classes, common logic, or specific features (like recording UI).
 
 
-Module Overview
-domain
+# Module Overview
+- domain
 
 Entities (Recording, AudioEntity)
 Use cases (RecordAudioUseCase, ReduceNoiseUseCase, GetAllRecordingsUseCase, etc.)
 Repository interface(s) (AudioRepository).
-data
+
+ - data
 
 Implementation of AudioRepository (AudioRepositoryImpl), referencing Room DAOs.
 Room database (RecordingDao, RecordingDatabase).
 AudioRecord logic for capturing raw audio and saving to WAV.
 Mappers for converting database entities <-> domain models.
-feature:recording (optional separate module)
+
+- feature:recording (optional separate module)
 
 RecordingViewModel for Compose UI states.
 UI composables (RecordingScreenComposable) for record/playback.
-app
+
+- app
 
 MainActivity, top-level Compose setContent.
 Hilt @AndroidEntryPoint application class.
