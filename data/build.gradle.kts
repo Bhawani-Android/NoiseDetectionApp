@@ -43,6 +43,12 @@ dependencies {
     implementation(libs.hilt.android.v247)
     kapt(libs.hilt.android.compiler.v247)
 
+    // Room
+    implementation (libs.androidx.room.runtime)
+    kapt (libs.androidx.room.compiler)
+    implementation(libs.androidx.room.common)
+    implementation(libs.androidx.room.ktx)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(project(":domain"))

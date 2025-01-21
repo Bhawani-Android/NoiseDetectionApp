@@ -1,6 +1,7 @@
 package com.example.domain.repository
 
 import com.example.domain.entity.AudioEntity
+import com.example.domain.entity.Recording
 import kotlinx.coroutines.flow.Flow
 
 interface AudioRepository {
@@ -22,7 +23,7 @@ interface AudioRepository {
     suspend fun reduceNoise(audio: AudioEntity): AudioEntity
 
     /**
-     * Play recorded audio; can also return a Flow or callback if needed.
+     * Play recorded audio;
      */
      fun playAudio(audio: AudioEntity, play: Boolean)
      fun getCurrentPosition(audio: AudioEntity): Int
@@ -37,4 +38,6 @@ interface AudioRepository {
      * Check if there's an existing recording in storage or memory.
      */
     suspend fun getLastRecordedAudio(): AudioEntity?
+    fun getAllRecordingsFlow(): Flow<List<Recording>>
+
 }

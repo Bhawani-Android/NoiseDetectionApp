@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.domain.entity.AudioEntity
+import com.example.domain.entity.Recording
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -78,36 +79,40 @@ fun RecordingScreenComposable(
          */
         uiState.recordedAudio?.let { audio ->
             PlaybackSection(uiState, viewModel, audio)
+            Divider(modifier = Modifier.padding(vertical = 16.dp))
         } ?: run {
+
+        }
+
+        /**
+         * List of previously recorded files.
+         */
+
+
+
+        if (uiState.recordings.isNotEmpty()) {
+            Text(
+                text = "Your Recordings",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            LazyColumn {
+                items(uiState.recordings) { rec ->
+                    RecordingItemCard(
+                        recording = rec,
+                        onPlay = { viewModel.playRecording(it) },
+                        onDelete = { viewModel.deleteRecording(it) }
+                    )
+                }
+            }
+
+        } else {
             Text(
                 text = "No Audio Recorded Yet",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
-
-        Divider(modifier = Modifier.padding(vertical = 16.dp))
-
-        /**
-         * Section 3 (Future): List of previously recorded files.
-         * For now, we show a placeholder or commented out code.
-         *
-         * If you had a list of recordings in your state (uiState.recordings),
-         * you could do:
-         */
-
-//        if (uiState.recordings.isNotEmpty()) {
-//            Text(
-//                text = "Your Recordings",
-//                style = MaterialTheme.typography.titleLarge,
-//                modifier = Modifier.padding(bottom = 8.dp)
-//            )
-//            LazyColumn {
-//                items(uiState.recordings) { audio ->
-//                    RecordingItemCard(audio = audio, onPlay = { ... }, onDelete = { ... })
-//                }
-//            }
-//        }
     }
 }
 
@@ -220,14 +225,12 @@ fun PlaybackSection(
     }
 }
 
-/**
- * Future: show an individual recording in a Card layout if we had a list of them.
- */
+
 @Composable
 fun RecordingItemCard(
-    audio: AudioEntity,
-    onPlay: (AudioEntity) -> Unit,
-    onDelete: (AudioEntity) -> Unit
+    recording: Recording,
+    onPlay: (Recording) -> Unit,
+    onDelete: (Recording) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -238,20 +241,18 @@ fun RecordingItemCard(
         )
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            Text(
-                text = audio.filePath,
-                style = MaterialTheme.typography.titleSmall
-            )
-            // Possibly show duration or last modified time
+            Text(text = recording.filePath, style = MaterialTheme.typography.titleSmall)
+            // Possibly show formatTime(recording.durationMillis)
             Row {
-                Button(onClick = { onPlay(audio) }) {
+                Button(onClick = { onPlay(recording) }) {
                     Text("Play")
                 }
                 Spacer(modifier = Modifier.width(16.dp))
-                Button(onClick = { onDelete(audio) }) {
+                Button(onClick = { onDelete(recording) }) {
                     Text("Delete")
                 }
             }
         }
     }
 }
+

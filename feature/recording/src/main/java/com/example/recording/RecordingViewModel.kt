@@ -3,12 +3,9 @@ package com.example.recording
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.CommonUtils
-import com.example.domain.usecase.DeleteAudioUseCase
-import com.example.domain.usecase.GetDurationUseCase
-import com.example.domain.usecase.GetPlaybackPositionUseCase
-import com.example.domain.usecase.PlayBackUseCase
-import com.example.domain.usecase.RecordAudioUseCase
-import com.example.domain.usecase.ReduceNoiseUseCase
+import com.example.domain.entity.AudioEntity
+import com.example.domain.entity.Recording
+import com.example.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,20 +24,29 @@ class RecordingViewModel @Inject constructor(
     private val playBackUseCase: PlayBackUseCase,
     private val getPlaybackPositionUseCase: GetPlaybackPositionUseCase,
     private val getDurationUseCase: GetDurationUseCase,
-    private val deleteAudioUseCase: DeleteAudioUseCase
-): ViewModel(){
-    private val _uiState =  MutableStateFlow(RecordingUiState())
+    private val deleteAudioUseCase: DeleteAudioUseCase,
+    private val getAllRecordingsUseCase: GetAllRecordingsUseCase
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(RecordingUiState())
     val uiState: StateFlow<RecordingUiState> = _uiState
 
-    private var maxFileSizeBytes = 5 * 1024 * 1024 // 5MB
-    private var maxDurationMillis = 60_000L // 1 minute
-
+    private val maxDurationMillis = 60_000L // 1 minute
     private var startTime: Long = 0
     private var playbackJob: Job? = null
 
+    init {
+        // Observe the list of all recordings from the DB
+        viewModelScope.launch {
+            getAllRecordingsUseCase().collectLatest { recordings ->
+                _uiState.update { it.copy(recordings = recordings) }
+            }
+        }
+    }
 
-    fun startRecording(thresholdDb: Double)  {
-        if(_uiState.value.isRecording) return
+    /** Start recording flow, with real-time dB emission */
+    fun startRecording(thresholdDb: Double) {
+        if (_uiState.value.isRecording) return
         _uiState.update {
             it.copy(
                 isRecording = true,
@@ -61,8 +67,8 @@ class RecordingViewModel @Inject constructor(
                         hasNoiseWarning = showWarning
                     )
                 }
-                // If the user hits the 1 min limit, or the file is over 5MB (we can't easily check file size here unless we have path)
-                // For simplicity, we only show a time-based check:
+
+                // If we exceed time limit => automatically stop
                 if (elapsed >= maxDurationMillis) {
                     stopRecording()
                 }
@@ -70,15 +76,23 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-     fun stopRecording() {
-        if(!_uiState.value.isRecording) return
+    /** Stop recording and store the last AudioEntity in uiState. */
+    fun stopRecording() {
+        if (!_uiState.value.isRecording) return
         viewModelScope.launch {
             val audio = recordAudioUseCase.stop()
             _uiState.update { old ->
-                old.copy(isRecording = false, currentDb = 0.0, hasNoiseWarning = false, recordedAudio = audio)
+                old.copy(
+                    isRecording = false,
+                    currentDb = 0.0,
+                    hasNoiseWarning = false,
+                    recordedAudio = audio
+                )
             }
         }
     }
+
+    /** Apply a naive noise reduction on the 'recordedAudio' (if present). */
     fun reduceNoise() {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
@@ -89,20 +103,16 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Toggle playback with a boolean. If true => play, false => pause.
-     */
+    /** Toggle playback (play/pause) for the current 'recordedAudio' in state. */
     fun playAudio(playAudio: Boolean) {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
             playBackUseCase(audio, playAudio)
 
             if (playAudio) {
-                // Start polling playback position
                 startPollingPlaybackPosition()
                 _uiState.update { it.copy(isPlaying = true) }
             } else {
-                // Cancel polling
                 stopPollingPlaybackPosition()
                 _uiState.update { it.copy(isPlaying = false) }
             }
@@ -110,46 +120,26 @@ class RecordingViewModel @Inject constructor(
     }
 
     /**
-     * Launch a background job that periodically updates currentPlaybackPositionMs
-     * in the UI state while isPlaying == true.
+     * For the future: directly play a domain-level 'Recording' from the list.
+     * We'll convert it to an AudioEntity, set it as the active recordedAudio, then call playAudio(true).
      */
-    private fun startPollingPlaybackPosition() {
-        // Cancel any previous job
-        playbackJob?.cancel()
+    fun playRecording(rec: Recording, playAudio: Boolean = true) {
+        // Convert domain 'Recording' to 'AudioEntity'
+        val audioEntity = AudioEntity(
+            filePath = rec.filePath,
+            durationMillis = rec.durationMillis
+        )
+        // Set the recordedAudio as this item
+        _uiState.update { it.copy(recordedAudio = audioEntity) }
 
-        // Start a new job
-        playbackJob = viewModelScope.launch(Dispatchers.IO) {
-            val audio = _uiState.value.recordedAudio ?: return@launch
-
-            // Retrieve total duration from the repository
-            val totalMs = getDurationUseCase(audio)
-
-            while (_uiState.value.isPlaying) {
-                val currentMs = getPlaybackPositionUseCase(audio)
-
-                // Update UI state
-                _uiState.update { old ->
-                    old.copy(
-                        currentPositionMs = currentMs.toLong(),
-                        totalDurationMs = totalMs.toLong()
-                    )
-                }
-
-                // Sleep a bit
-                delay(500) // poll every 0.5s
-            }
-        }
+        // Now just call our existing 'playAudio(true)'
+        playAudio(playAudio)
     }
 
     /**
-     * Stop the playback polling job.
+     * Delete the *currently active* 'recordedAudio' from the UI state.
+     * Typically called by the 'Delete' button in the PlaybackSection.
      */
-    private fun stopPollingPlaybackPosition() {
-        playbackJob?.cancel()
-        playbackJob = null
-    }
-
-
     fun deleteAudio() {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
@@ -162,4 +152,50 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Delete a domain-level 'Recording' from the list. This does not rely on 'recordedAudio'.
+     * We'll convert the 'Recording' to an 'AudioEntity' and call [deleteAudioUseCase].
+     */
+    fun deleteRecording(rec: Recording) {
+        val audioEntity = AudioEntity(
+            filePath = rec.filePath,
+            durationMillis = rec.durationMillis
+        )
+        viewModelScope.launch {
+            val success = deleteAudioUseCase(audioEntity)
+            if (success) {
+                // If the currently active 'recordedAudio' matches this, clear it
+                if (_uiState.value.recordedAudio?.filePath == rec.filePath) {
+                    _uiState.update { old ->
+                        old.copy(recordedAudio = null, isPlaying = false)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Polls the playback position while playing. */
+    private fun startPollingPlaybackPosition() {
+        playbackJob?.cancel()
+        playbackJob = viewModelScope.launch(Dispatchers.IO) {
+            val audio = _uiState.value.recordedAudio ?: return@launch
+            val totalMs = getDurationUseCase(audio)
+
+            while (_uiState.value.isPlaying) {
+                val currentMs = getPlaybackPositionUseCase(audio)
+                _uiState.update { old ->
+                    old.copy(
+                        currentPositionMs = currentMs.toLong(),
+                        totalDurationMs = totalMs.toLong()
+                    )
+                }
+                delay(500)
+            }
+        }
+    }
+
+    private fun stopPollingPlaybackPosition() {
+        playbackJob?.cancel()
+        playbackJob = null
+    }
 }

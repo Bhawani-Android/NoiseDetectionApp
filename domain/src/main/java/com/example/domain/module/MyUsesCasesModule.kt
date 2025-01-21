@@ -8,9 +8,7 @@ import com.example.domain.usecase.ReduceNoiseUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.components.ViewModelComponent
 import dagger.hilt.components.SingletonComponent
-import javax.inject.Named
 
 @Module
 @InstallIn(SingletonComponent::class)
