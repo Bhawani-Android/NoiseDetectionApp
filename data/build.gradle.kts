@@ -33,7 +33,6 @@ android {
         jvmTarget = "11"
     }
 }
-
 dependencies {
 
     implementation(project(":domain"))
@@ -48,6 +47,10 @@ dependencies {
     kapt (libs.androidx.room.compiler)
     implementation(libs.androidx.room.common)
     implementation(libs.androidx.room.ktx)
+
+    implementation ("com.arthenica:ffmpeg-kit-full:4.5")
+
+
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)

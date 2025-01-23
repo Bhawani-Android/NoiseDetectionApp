@@ -38,10 +38,9 @@ fun RecordingScreenComposable(
     viewModel: RecordingViewModel,
     modifier: Modifier = Modifier
 ) {
-    // Observe the UI state from the ViewModel
     val uiState = viewModel.uiState.collectAsState().value
 
-    // Permissions for RECORD_AUDIO
+    // Step 1: Check RECORD_AUDIO permission
     val recordAudioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
     val isMicGranted = recordAudioPermissionState.status.isGranted
 
@@ -50,52 +49,37 @@ fun RecordingScreenComposable(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        /** Title **/
+        // Title
         Text(
             text = "Noise Detection Recorder",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        /**
-         * Section 1: Microphone permission request (if not granted).
-         * Otherwise, show Start/Stop Recording controls.
-         */
+        // 2) If mic not granted, show a "Request Permission" section. Else show record controls
         if (!isMicGranted) {
-            PermissionRequestSection(
-                onRequestPermission = {
-                    recordAudioPermissionState.launchPermissionRequest()
-                }
-            )
+            PermissionRequestSection {
+                recordAudioPermissionState.launchPermissionRequest()
+            }
         } else {
             RecordingControlsSection(uiState, viewModel)
         }
 
-        Divider(modifier = Modifier.padding(vertical = 16.dp))
+        Divider(Modifier.padding(vertical = 16.dp))
 
-        /**
-         * Section 2: If we have a recorded file, show playback & noise reduction UI,
-         * plus an indicator for the current playback position vs. total duration.
-         */
+        // 3) If we have an active/last-recorded AudioEntity, show playback section
         uiState.recordedAudio?.let { audio ->
             PlaybackSection(uiState, viewModel, audio)
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
-        } ?: run {
-
+            Divider(Modifier.padding(vertical = 16.dp))
         }
 
-        /**
-         * List of previously recorded files.
-         */
-
-
-
+        // 4) Show the list of all recordings
         if (uiState.recordings.isNotEmpty()) {
             Text(
                 text = "Your Recordings",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 8.dp)
+                style = MaterialTheme.typography.titleLarge
             )
+            Spacer(Modifier.height(8.dp))
             LazyColumn {
                 items(uiState.recordings) { rec ->
                     RecordingItemCard(
@@ -105,7 +89,6 @@ fun RecordingScreenComposable(
                     )
                 }
             }
-
         } else {
             Text(
                 text = "No Audio Recorded Yet",
@@ -116,9 +99,8 @@ fun RecordingScreenComposable(
     }
 }
 
-/**
- * Simple composable to request microphone permission.
- */
+// --- Permission UI
+
 @Composable
 fun PermissionRequestSection(onRequestPermission: () -> Unit) {
     Text(
@@ -127,13 +109,12 @@ fun PermissionRequestSection(onRequestPermission: () -> Unit) {
         modifier = Modifier.padding(bottom = 12.dp)
     )
     Button(onClick = onRequestPermission) {
-        Text("Request Microphone Permission")
+        Text("Grant Microphone Permission")
     }
 }
 
-/**
- * Start/Stop recording UI controls.
- */
+// --- Record/Stop Controls
+
 @Composable
 fun RecordingControlsSection(
     uiState: RecordingUiState,
@@ -149,12 +130,9 @@ fun RecordingControlsSection(
         }
     }
 
-    // If you want to show the decibel + noise warning while recording, or always:
-    Spacer(modifier = Modifier.height(16.dp))
-    Text(
-        text = "Current dB: %.1f".format(uiState.currentDb),
-        style = MaterialTheme.typography.bodyMedium
-    )
+    Spacer(Modifier.height(12.dp))
+
+    Text("Current dB: %.1f".format(uiState.currentDb))
     if (uiState.hasNoiseWarning) {
         Text(
             text = "Noise threshold exceeded!",
@@ -164,59 +142,52 @@ fun RecordingControlsSection(
     }
 }
 
-/**
- * Playback, time indicator, noise reduction, and delete UI.
- */
+// --- Playback UI
+
 @Composable
 fun PlaybackSection(
     uiState: RecordingUiState,
     viewModel: RecordingViewModel,
     audio: AudioEntity
 ) {
-    // Show file path or name
+    // Show file path
     Text(
         text = "Recorded Audio:\n${audio.filePath}",
         style = MaterialTheme.typography.bodySmall,
         textAlign = TextAlign.Center,
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(bottom = 8.dp)
     )
 
-    // Time indicator row: mm:ss / mm:ss
+    // Timer
     Row(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(bottom = 8.dp)
     ) {
-        Text(
-            text = formatTime(uiState.currentPositionMs),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Text(
-            text = " / ",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Text(
-            text = formatTime(uiState.totalDurationMs),
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Text(formatTime(uiState.currentPositionMs))
+        Text(" / ")
+        Text(formatTime(uiState.totalDurationMs))
     }
 
-    // Playback, Noise Reduction, Delete
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    // If playing => show "Pause" + hide "Reduce Noise"
+    // If NOT playing => show "Play" + show "Reduce Noise"
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (uiState.isPlaying) {
             Button(onClick = { viewModel.playAudio(false) }) {
                 Text("Pause")
+            }
+            // Hide or disable the "Reduce Noise" button if currently playing:
+            // e.g. disabled:
+            Button(onClick = {}, enabled = false) {
+                Text("Reduce Noise")
             }
         } else {
             Button(onClick = { viewModel.playAudio(true) }) {
                 Text("Play")
             }
-        }
-
-        Button(onClick = { viewModel.reduceNoise() }) {
-            Text("Reduce Noise")
+            Button(onClick = { viewModel.reduceNoise() }) {
+                Text("Reduce Noise")
+            }
         }
 
         Button(onClick = { viewModel.deleteAudio() }) {
@@ -225,6 +196,7 @@ fun PlaybackSection(
     }
 }
 
+// --- Recording List UI
 
 @Composable
 fun RecordingItemCard(
@@ -235,19 +207,19 @@ fun RecordingItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
+            .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            Text(text = recording.filePath, style = MaterialTheme.typography.titleSmall)
-            // Possibly show formatTime(recording.durationMillis)
+            Text(text = recording.filePath, style = MaterialTheme.typography.bodySmall)
+            Spacer(modifier = Modifier.height(4.dp))
             Row {
                 Button(onClick = { onPlay(recording) }) {
                     Text("Play")
                 }
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(Modifier.width(16.dp))
                 Button(onClick = { onDelete(recording) }) {
                     Text("Delete")
                 }

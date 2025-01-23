@@ -3,9 +3,14 @@ package com.example.data.repository
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.util.Log
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import com.example.data.local.RecordingDao
 import com.example.data.local.RecordingEntity
 import com.example.data.mapper.toDomain
+import com.example.data.utils.wavutils.AmplitudeGate
+import com.example.data.utils.wavutils.WavFileReader
+import com.example.data.utils.wavutils.WavFileWriter
 import com.example.domain.entity.AudioEntity
 import com.example.domain.entity.Recording
 import com.example.domain.repository.AudioRepository
@@ -36,11 +41,10 @@ class AudioRepositoryImpl @Inject constructor(
     }
 
     override fun getAllRecordingsFlow(): Flow<List<Recording>> {
-        return recordingDao.getAllRecordingsFlow().map { entityList ->
-            entityList.map { it.toDomain() }
+        return recordingDao.getAllRecordingsFlow().map { entities ->
+            entities.map { it.toDomain() }
         }
     }
-
 
     override fun startRecording(thresholdDb: Double): Flow<Double> = flow {
         val tmpFile = File.createTempFile("record_", ".m4a")
@@ -58,13 +62,11 @@ class AudioRepositoryImpl @Inject constructor(
 
         Log.d(TAG, "startRecording: ${tmpFile.absolutePath}")
 
-        // Real-time noise detection / file-size check
         while (isRecording) {
             val amplitude = mediaRecorder?.maxAmplitude ?: 0
             val db = if (amplitude > 0) 20 * log10(amplitude.toDouble()) else 0.0
             emit(db)
 
-            // File size check
             if (tmpFile.length() > MAX_FILE_SIZE_BYTES) {
                 Log.d(TAG, "File exceeded 5MB, stopping.")
                 stopRecording()
@@ -85,55 +87,93 @@ class AudioRepositoryImpl @Inject constructor(
         }
         mediaRecorder = null
 
-        outputFile?.let { file ->
-            val durationMs = estimateDuration(file)
-            val audio = AudioEntity(
-                filePath = file.absolutePath,
-                durationMillis = durationMs
-            )
-            Log.d(TAG, "stopRecording: $audio")
+        val file = outputFile ?: return@withContext null
+        val durationMs = estimateDuration(file)
+        val audio = AudioEntity(filePath = file.absolutePath, durationMillis = durationMs)
+        Log.d(TAG, "stopRecording: $audio")
 
-            // Insert into the DB
-            val entity = RecordingEntity(
-                filePath = file.absolutePath,
-                timestamp = System.currentTimeMillis(),
-                durationMillis = durationMs,
-                isNoisy = false // default
-            )
-            val newId = recordingDao.insertRecording(entity)
-            Log.d(TAG, "Inserted recording with id=$newId")
+        val entity = RecordingEntity(
+            filePath = file.absolutePath,
+            timestamp = System.currentTimeMillis(),
+            durationMillis = durationMs,
+            isNoisy = false
+        )
 
-            return@withContext audio
-        }
-        return@withContext null
+        recordingDao.insertRecording(entity)
+
+        return@withContext audio
     }
 
-    /**
-     * A naive example of "noise reduction" which simply copies the file to a new name,
-     * or if you had a WAV, you might do zeroing of samples or TarsosDSP.
-     */
     override suspend fun reduceNoise(audio: AudioEntity): AudioEntity = withContext(Dispatchers.IO) {
-        // If you want advanced noise reduction, do decode -> DSP -> re-encode
-        val cleanedFile = File(audio.filePath.replace(".m4a", "_cleaned.m4a"))
-        File(audio.filePath).copyTo(cleanedFile, overwrite = true)
+        val inputM4A = File(audio.filePath)
+        if (!inputM4A.exists()) return@withContext audio
 
-        // Update the DB to reflect isNoisy=false
-        // You’d need to query the recording by file path, then update the entity
-        val existing = recordingDao.getRecordingByFilePath(audio.filePath)
-        existing?.let {
-            val updated = it.copy(
-                filePath = cleanedFile.absolutePath,
-                isNoisy = false
-            )
-            recordingDao.insertRecording(updated) // upsert
+        // Decode to WAV
+        val decodedWavFile = decodeM4AToWav(inputM4A) ?: return@withContext fallbackCopy(audio)
+
+        // Apply noise gating
+        val gateOutput = File.createTempFile("cleaned_", ".wav", inputM4A.parentFile)
+        applyAmplitudeGate(decodedWavFile, gateOutput)
+
+        // Recalculate duration
+        val newDuration = estimateDuration(gateOutput)
+
+        if (newDuration == 0L) {
+            Log.e(TAG, "reduceNoise: Gated file has zero duration!")
+            return@withContext fallbackCopy(audio)
         }
 
-        return@withContext audio.copy(filePath = cleanedFile.absolutePath, isNoisy = false)
+        // Update database
+        val existing = recordingDao.getRecordingByFilePath(audio.filePath)
+        if (existing != null) {
+            val updated = existing.copy(filePath = gateOutput.absolutePath, durationMillis = newDuration, isNoisy = false)
+            recordingDao.insertRecording(updated)
+        }
+
+        return@withContext audio.copy(filePath = gateOutput.absolutePath, durationMillis = newDuration, isNoisy = false)
     }
+
+
+    private suspend fun fallbackCopy(audio: AudioEntity): AudioEntity  = withContext(Dispatchers.IO){
+        val fallbackFile = File(audio.filePath.replace(".m4a", "_naive.m4a"))
+        File(audio.filePath).copyTo(fallbackFile, overwrite = true)
+
+        val existing = recordingDao.getRecordingByFilePath(audio.filePath)
+        if (existing != null) {
+            val updated = existing.copy(filePath = fallbackFile.absolutePath, isNoisy = false)
+            recordingDao.insertRecording(updated)
+        }
+        return@withContext audio.copy(filePath = fallbackFile.absolutePath, isNoisy = false)
+    }
+
+    private fun decodeM4AToWav(input: File): File? {
+        val outputWav = File.createTempFile("decoded_", ".wav", input.parentFile)
+        val cmd = "-y -i ${input.absolutePath} -acodec pcm_s16le -ac 1 -ar 44100 ${outputWav.absolutePath}"
+        val session = FFmpegKit.execute(cmd)
+        val returnCode = session.returnCode
+        return if (ReturnCode.isSuccess(returnCode)) {
+            Log.d(TAG, "decodeM4AToWav success => ${outputWav.absolutePath}")
+            outputWav
+        } else {
+            Log.e(TAG, "decodeM4AToWav fail => code=$returnCode logs=${session.allLogsAsString}")
+            null
+        }
+    }
+
+    private fun applyAmplitudeGate(inputWav: File, outputWav: File) {
+        // read wav => short array
+        val (format, samples) = WavFileReader.readWav(inputWav)
+        // apply gating
+        // e.g. threshold=200 => below that = 0
+        AmplitudeGate.applyAmplitudeGate(samples, 30)
+
+        // write out
+        WavFileWriter.writeWav(outputWav, format, samples)
+    }
+
 
     override fun playAudio(audio: AudioEntity, play: Boolean) {
         if (play) {
-            // Start or resume playback
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
@@ -142,14 +182,21 @@ class AudioRepositoryImpl @Inject constructor(
                 start()
             }
         } else {
-            // Pause if currently playing
             mediaPlayer?.pause()
         }
     }
 
     override fun getCurrentPosition(audio: AudioEntity): Int {
-        return mediaPlayer?.currentPosition ?: 0
+        // Option A: try/catch
+        val mp = mediaPlayer ?: return 0
+        return try {
+            mp.currentPosition
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "getCurrentPosition: MediaPlayer invalid state => $e")
+            0
+        }
     }
+
 
     override fun getDuration(audio: AudioEntity): Int {
         return mediaPlayer?.duration ?: audio.durationMillis.toInt()
@@ -158,23 +205,19 @@ class AudioRepositoryImpl @Inject constructor(
     override suspend fun deleteAudio(audio: AudioEntity): Boolean = withContext(Dispatchers.IO) {
         val file = File(audio.filePath)
         val success = file.exists() && file.delete()
-
-        // Also remove from DB
         val existing = recordingDao.getRecordingByFilePath(audio.filePath)
-        existing?.let {
-            recordingDao.deleteRecording(it.id)
+        if (existing != null) {
+            recordingDao.deleteRecording(existing.id)
         }
-
         success
     }
 
     override suspend fun getLastRecordedAudio(): AudioEntity? = withContext(Dispatchers.IO) {
         outputFile?.let {
-            AudioEntity(filePath = it.absolutePath, durationMillis = estimateDuration(it))
+            AudioEntity(it.absolutePath, estimateDuration(it))
         }
     }
 
-    // Helper function to estimate duration (similar to your code)
     private fun estimateDuration(file: File): Long {
         val mp = MediaPlayer().apply { setDataSource(file.absolutePath) }
         mp.prepare()

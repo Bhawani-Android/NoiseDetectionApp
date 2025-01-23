@@ -1,6 +1,8 @@
 [versions]
 activityComposeVersion = "1.10.0"
 agp = "8.7.3"
+dsp = "2.4.5"
+ffmpegKitFull = "4.5"
 hiltAndroid = "2.51.1"
 hiltAndroidCompiler = "2.51.1"
 hiltAndroidGradlePlugin = "2.51.1"
@@ -17,6 +19,7 @@ lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.10.0"
 composeBom = "2025.01.00"
 lifecycleRuntimeKtxVersion = "2.8.7"
+rnnoise4j = "0.0.5"
 roomCompiler = "2.6.1"
 roomRuntime = "2.6.1"
 runner = "1.0.2"
@@ -41,6 +44,8 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 dagger-hilt-android-v247 = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroidVersion" }
+dsp = { module = "be.tarsos:dsp", version.ref = "dsp" }
+ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full", version.ref = "ffmpegKitFull" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroidGradlePlugin" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroidCompiler" }
 hilt-android-compiler-v247 = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroidCompiler" }
@@ -61,6 +66,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlinStdlib" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 material3 = { module = "androidx.compose.material3:material3" }
+rnnoise4j = { module = "com.github.corbind:rnnoise4j", version.ref = "rnnoise4j" }
 runner = { group = "com.android.support.test", name = "runner", version.ref = "runner" }
 espresso-core = { group = "com.android.support.test.espresso", name = "espresso-core", version.ref = "espressoCoreVersion" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
