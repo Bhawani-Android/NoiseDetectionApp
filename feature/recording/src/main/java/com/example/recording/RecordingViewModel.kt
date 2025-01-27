@@ -28,7 +28,7 @@ class RecordingViewModel @Inject constructor(
     private val getAllRecordingsUseCase: GetAllRecordingsUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(RecordingUiState())
+    val _uiState = MutableStateFlow(RecordingUiState())
     val uiState: StateFlow<RecordingUiState> = _uiState
 
     private val maxDurationMillis = 60_000L // 1 minute
