@@ -36,7 +36,6 @@ class RecordingViewModel @Inject constructor(
     private var playbackJob: Job? = null
 
     init {
-        // Observe the list of all recordings from the DB
         viewModelScope.launch {
             getAllRecordingsUseCase().collectLatest { recordings ->
                 _uiState.update { it.copy(recordings = recordings) }
@@ -44,7 +43,6 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /** Start recording flow, with real-time dB emission */
     fun startRecording(thresholdDb: Double) {
         if (_uiState.value.isRecording) return
         _uiState.update {
@@ -68,7 +66,6 @@ class RecordingViewModel @Inject constructor(
                     )
                 }
 
-                // If we exceed time limit => automatically stop
                 if (elapsed >= maxDurationMillis) {
                     stopRecording()
                 }
@@ -76,7 +73,6 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /** Stop recording and store the last AudioEntity in uiState. */
     fun stopRecording() {
         if (!_uiState.value.isRecording) return
         viewModelScope.launch {
@@ -92,7 +88,6 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /** Apply a naive noise reduction on the 'recordedAudio' (if present). */
     fun reduceNoise() {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
@@ -103,7 +98,6 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /** Toggle playback (play/pause) for the current 'recordedAudio' in state. */
     fun playAudio(playAudio: Boolean) {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
@@ -119,10 +113,6 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /**
-     * For the future: directly play a domain-level 'Recording' from the list.
-     * We'll convert it to an AudioEntity, set it as the active recordedAudio, then call playAudio(true).
-     */
     fun playRecording(rec: Recording, playAudio: Boolean = true) {
         // Convert domain 'Recording' to 'AudioEntity'
         val audioEntity = AudioEntity(
@@ -136,10 +126,7 @@ class RecordingViewModel @Inject constructor(
         playAudio(playAudio)
     }
 
-    /**
-     * Delete the *currently active* 'recordedAudio' from the UI state.
-     * Typically called by the 'Delete' button in the PlaybackSection.
-     */
+
     fun deleteAudio() {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
@@ -152,10 +139,7 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Delete a domain-level 'Recording' from the list. This does not rely on 'recordedAudio'.
-     * We'll convert the 'Recording' to an 'AudioEntity' and call [deleteAudioUseCase].
-     */
+
     fun deleteRecording(rec: Recording) {
         val audioEntity = AudioEntity(
             filePath = rec.filePath,
@@ -174,7 +158,7 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    /** Polls the playback position while playing. */
+
     private fun startPollingPlaybackPosition() {
         playbackJob?.cancel()
         playbackJob = viewModelScope.launch(Dispatchers.IO) {

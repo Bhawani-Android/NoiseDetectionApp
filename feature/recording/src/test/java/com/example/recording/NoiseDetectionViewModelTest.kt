@@ -52,7 +52,6 @@ class NoiseDetectionViewModelTest {
 
         coEvery { getAllRecordingsUseCase.invoke() } returns flowOf(emptyList())
 
-        // Create your real ViewModel with mocks
         viewModel = RecordingViewModel(
             recordAudioUseCase,
             reduceNoiseUseCase,
@@ -91,11 +90,6 @@ class NoiseDetectionViewModelTest {
     }
 }
 
-/**
- * Example extension for testing only.
- * In real code, you might manipulate the stateFlow or produce test flows
- * to simulate dB changes. Here, we directly mutate the private _uiState.
- */
 fun RecordingViewModel.testSetCurrentDb(db: Double) {
     _uiState.update { old ->
         old.copy(
