@@ -29,6 +29,7 @@ class RecordingViewModel @Inject constructor(
 ) : ViewModel() {
 
     val _uiState = MutableStateFlow(RecordingUiState())
+    // recordingUiState
     val uiState: StateFlow<RecordingUiState> = _uiState
 
     private val maxDurationMillis = 60_000L // 1 minute
@@ -43,6 +44,7 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
+    // use more intuitive names
     fun startRecording(thresholdDb: Double) {
         if (_uiState.value.isRecording) return
         _uiState.update {
@@ -89,6 +91,7 @@ class RecordingViewModel @Inject constructor(
     }
 
     fun reduceNoise() {
+        // try to reduce the noise in live recording
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
             val newAudio = reduceNoiseUseCase(audio)

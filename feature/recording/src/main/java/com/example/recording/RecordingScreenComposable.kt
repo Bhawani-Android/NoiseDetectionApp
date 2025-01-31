@@ -25,6 +25,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 /**
  * Formats milliseconds to mm:ss
  */
+
+// move it to utils
 fun formatTime(milliseconds: Long): String {
     val totalSeconds = milliseconds / 1000
     val minutes = totalSeconds / 60
@@ -32,12 +34,15 @@ fun formatTime(milliseconds: Long): String {
     return "%02d:%02d".format(minutes, seconds)
 }
 
+// RecordingScreen
+// This function is to big, try to refactor it
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun RecordingScreenComposable(
     viewModel: RecordingViewModel,
     modifier: Modifier = Modifier
 ) {
+    //Why not withLifeCycle
     val uiState = viewModel.uiState.collectAsState().value
 
     // Step 1: Check RECORD_AUDIO permission
@@ -50,6 +55,7 @@ fun RecordingScreenComposable(
             .padding(16.dp)
     ) {
         // Title
+        // try to be generic(responsive) so as to accommodate to every screen size
         Text(
             text = "Noise Detection Recorder",
             style = MaterialTheme.typography.headlineMedium,
@@ -69,12 +75,14 @@ fun RecordingScreenComposable(
 
         // 3) If we have an active/last-recorded AudioEntity, show playback section
         uiState.recordedAudio?.let { audio ->
+            // should not pass entire view model
             PlaybackSection(uiState, viewModel, audio)
             Divider(Modifier.padding(vertical = 16.dp))
         }
 
         // 4) Show the list of all recordings
         if (uiState.recordings.isNotEmpty()) {
+            // use composable
             Text(
                 text = "Your Recordings",
                 style = MaterialTheme.typography.titleLarge
@@ -115,13 +123,17 @@ fun PermissionRequestSection(onRequestPermission: () -> Unit) {
 
 // --- Record/Stop Controls
 
+// pass only required parameters
 @Composable
 fun RecordingControlsSection(
     uiState: RecordingUiState,
     viewModel: RecordingViewModel
 ) {
+    //Optimize this
     if (!uiState.isRecording) {
+        // create a global constant file for these values
         Button(onClick = { viewModel.startRecording(thresholdDb = 60.0) }) {
+            // use xml string file for these
             Text("Start Recording")
         }
     } else {
@@ -132,6 +144,8 @@ fun RecordingControlsSection(
 
     Spacer(Modifier.height(12.dp))
 
+
+    // See if we can pause and start from same point
     Text("Current dB: %.1f".format(uiState.currentDb))
     if (uiState.hasNoiseWarning) {
         Text(
