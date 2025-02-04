@@ -25,6 +25,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.log10
 
+// we can use recorderimpl and playbackimpl
 @Singleton
 class AudioRepositoryImpl @Inject constructor(
     private val recordingDao: RecordingDao
@@ -50,8 +51,10 @@ class AudioRepositoryImpl @Inject constructor(
         val tmpFile = File.createTempFile("record_", ".m4a")
         outputFile = tmpFile
 
+        // don't use deprecated code
         mediaRecorder = MediaRecorder().apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
+            // we can ask user for o/p format
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setOutputFile(tmpFile.absolutePath)
@@ -63,6 +66,7 @@ class AudioRepositoryImpl @Inject constructor(
         Log.d(TAG, "startRecording: ${tmpFile.absolutePath}")
 
         while (isRecording) {
+            // refactor this to a function
             val amplitude = mediaRecorder?.maxAmplitude ?: 0
             val db = if (amplitude > 0) 20 * log10(amplitude.toDouble()) else 0.0
             emit(db)
@@ -76,6 +80,7 @@ class AudioRepositoryImpl @Inject constructor(
         }
     }
 
+    // ask the user to rename the audio before saving
     override suspend fun stopRecording(): AudioEntity? = withContext(Dispatchers.IO) {
         if (!isRecording) return@withContext null
         isRecording = false
@@ -92,6 +97,7 @@ class AudioRepositoryImpl @Inject constructor(
         val audio = AudioEntity(filePath = file.absolutePath, durationMillis = durationMs)
         Log.d(TAG, "stopRecording: $audio")
 
+        // add uuid as ref id to prevent multiple db calls
         val entity = RecordingEntity(
             filePath = file.absolutePath,
             timestamp = System.currentTimeMillis(),
@@ -124,6 +130,7 @@ class AudioRepositoryImpl @Inject constructor(
         }
 
         // Update database
+        //get by id
         val existing = recordingDao.getRecordingByFilePath(audio.filePath)
         if (existing != null) {
             val updated = existing.copy(filePath = gateOutput.absolutePath, durationMillis = newDuration, isNoisy = false)
@@ -165,6 +172,7 @@ class AudioRepositoryImpl @Inject constructor(
         val (format, samples) = WavFileReader.readWav(inputWav)
         // apply gating
         // e.g. threshold=200 => below that = 0
+        // use globals
         AmplitudeGate.applyAmplitudeGate(samples, 30)
 
         // write out
@@ -172,6 +180,7 @@ class AudioRepositoryImpl @Inject constructor(
     }
 
 
+    // playPauseAudio, isPlaying
     override fun playAudio(audio: AudioEntity, play: Boolean) {
         if (play) {
             mediaPlayer?.stop()
@@ -205,6 +214,7 @@ class AudioRepositoryImpl @Inject constructor(
     override suspend fun deleteAudio(audio: AudioEntity): Boolean = withContext(Dispatchers.IO) {
         val file = File(audio.filePath)
         val success = file.exists() && file.delete()
+        // we can eliminate this if we have uuid in entity
         val existing = recordingDao.getRecordingByFilePath(audio.filePath)
         if (existing != null) {
             recordingDao.deleteRecording(existing.id)

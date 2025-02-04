@@ -7,6 +7,7 @@ plugins {
 }
 
 android {
+    // use camelCasing
     namespace = "com.example.noisedetectionapp"
     compileSdk = 35
 
@@ -30,6 +31,7 @@ android {
         }
     }
     compileOptions {
+        // use latest version
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -50,6 +52,7 @@ android {
 
 dependencies {
 
+    // remove if not required
     implementation (project(":domain"))
     implementation (project(":data"))
     implementation (project(":core"))
