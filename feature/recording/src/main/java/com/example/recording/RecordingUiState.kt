@@ -3,6 +3,8 @@ package com.example.recording
 import com.example.domain.entity.AudioEntity
 import com.example.domain.entity.Recording
 
+// This is breaking the responsibility principle. Please segregate it.
+// We can use AudioState
 data class RecordingUiState(
     val isRecording: Boolean = false,
     val currentDb: Double = 0.0,
