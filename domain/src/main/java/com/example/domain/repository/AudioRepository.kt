@@ -40,4 +40,8 @@ interface AudioRepository {
     suspend fun getLastRecordedAudio(): AudioEntity?
     fun getAllRecordingsFlow(): Flow<List<Recording>>
 
+    // New function for renaming/saving a recording
+    suspend fun renameRecording(audio: AudioEntity, newName: String): AudioEntity?
+
+
 }

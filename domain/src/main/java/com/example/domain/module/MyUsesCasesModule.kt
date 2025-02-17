@@ -5,6 +5,7 @@ import com.example.domain.usecase.DeleteAudioUseCase
 import com.example.domain.usecase.PlayBackUseCase
 import com.example.domain.usecase.RecordAudioUseCase
 import com.example.domain.usecase.ReduceNoiseUseCase
+import com.example.domain.usecase.SaveRecordingUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,12 +29,12 @@ object MyUseCasesModule {
         return ReduceNoiseUseCase(audioRepository)
     }
 
-//    @Provides
-//    fun providePauseAudioUseCase(
-//        audioRepository: AudioRepository
-//    ): PauseAudioUseCase {
-//        return PauseAudioUseCase(audioRepository)
-//    }
+    @Provides
+    fun provideSaveRecordingUseCase(
+        audioRepository: AudioRepository
+    ): SaveRecordingUseCase {
+        return SaveRecordingUseCase(audioRepository)
+    }
 
 
     @Provides

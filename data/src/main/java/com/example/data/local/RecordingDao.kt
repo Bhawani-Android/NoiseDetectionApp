@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 interface RecordingDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertRecording(recording: RecordingEntity): Long
+    suspend fun upsertRecording(recording: RecordingEntity): Long
 
     @Query("SELECT * FROM recordings ORDER BY timestamp DESC")
     fun getAllRecordingsFlow(): Flow<List<RecordingEntity>>

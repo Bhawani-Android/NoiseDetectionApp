@@ -46,6 +46,7 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":core"))
     implementation(libs.androidx.lifecycle.viewmodel.android)
+    implementation(libs.androidx.lifecycle.runtime.compose.android)
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
@@ -68,7 +69,7 @@ dependencies {
     // Compose UI Test Manifest
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.5.0")
     testImplementation("io.mockk:mockk:1.13.5")
-
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
 
     // Compose
     val composeBom = platform("androidx.compose:compose-bom:2023.06.01")

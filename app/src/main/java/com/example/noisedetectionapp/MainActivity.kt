@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.noisedetectionapp.ui.theme.NoiseDetectionAppTheme
-import com.example.recording.RecordingScreenComposable
+import com.example.recording.ui.RecordingScreenComposable
 import com.example.recording.RecordingViewModel
 import dagger.hilt.android.AndroidEntryPoint
 

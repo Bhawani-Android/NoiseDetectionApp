@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="noise_detection_recorder">Noise Detection Recorder</string>
+    <string name="start_recording">Start Recording</string>
+    <string name="noise_threshold_exceeded">Noise threshold exceeded!</string>
+    <string name="current_db_1f">Current dB: %.1f</string>
+    <string name="pause">Pause</string>
+    <string name="reduce_noise">Reduce Noise</string>
+    <string name="play">Play</string>
+    <string name="reduce_noise_btn">Reduce Noise</string>
+    <string name="delete">Delete</string>
+    <string name="your_recordings">Your Recordings</string>
+</resources>

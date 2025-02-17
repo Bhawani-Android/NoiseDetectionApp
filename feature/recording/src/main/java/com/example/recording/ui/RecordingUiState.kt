@@ -1,10 +1,15 @@
-package com.example.recording
+package com.example.recording.ui
 
 import com.example.domain.entity.AudioEntity
 import com.example.domain.entity.Recording
 
-// This is breaking the responsibility principle. Please segregate it.
-// We can use AudioState
+/**
+ * Represents the UI state for recording and playback.
+ *
+ * Note: This data class currently includes both recording and playback fields.
+ * Consider splitting it (e.g. into [RecordingState] and [AudioPlaybackState]) to
+ * separate concerns more clearly.
+ */
 data class RecordingUiState(
     val isRecording: Boolean = false,
     val currentDb: Double = 0.0,

@@ -6,6 +6,7 @@ import com.example.core.CommonUtils
 import com.example.domain.entity.AudioEntity
 import com.example.domain.entity.Recording
 import com.example.domain.usecase.*
+import com.example.recording.ui.RecordingUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +18,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ViewModel responsible for recording, playback, and noise reduction.
+ *
+ * Note: The current [RecordingUiState] contains both recording and playback
+ * information. Consider refactoring this into separate state classes (e.g.
+ * [RecordingState] and [AudioPlaybackState]) to better adhere to the Single
+ * Responsibility Principle.
+ */
 @HiltViewModel
 class RecordingViewModel @Inject constructor(
     private val recordAudioUseCase: RecordAudioUseCase,
@@ -25,28 +34,35 @@ class RecordingViewModel @Inject constructor(
     private val getPlaybackPositionUseCase: GetPlaybackPositionUseCase,
     private val getDurationUseCase: GetDurationUseCase,
     private val deleteAudioUseCase: DeleteAudioUseCase,
-    private val getAllRecordingsUseCase: GetAllRecordingsUseCase
+    private val getAllRecordingsUseCase: GetAllRecordingsUseCase,
+    private val saveRecordingUseCase: SaveRecordingUseCase
 ) : ViewModel() {
 
-    val _uiState = MutableStateFlow(RecordingUiState())
-    // recordingUiState
+    private val _uiState = MutableStateFlow(RecordingUiState())
     val uiState: StateFlow<RecordingUiState> = _uiState
 
-    private val maxDurationMillis = 60_000L // 1 minute
+    // Maximum recording duration (e.g. 1 minute)
+    private val maxDurationMillis = 60_000L
     private var startTime: Long = 0
     private var playbackJob: Job? = null
 
     init {
         viewModelScope.launch {
+            // Listen for updates to the list of recordings.
             getAllRecordingsUseCase().collectLatest { recordings ->
                 _uiState.update { it.copy(recordings = recordings) }
             }
         }
     }
 
-    // use more intuitive names
+    /**
+     * Starts audio recording with a given noise threshold.
+     *
+     * @param thresholdDb The decibel threshold at which a noise warning should be shown.
+     */
     fun startRecording(thresholdDb: Double) {
         if (_uiState.value.isRecording) return
+
         _uiState.update {
             it.copy(
                 isRecording = true,
@@ -75,8 +91,12 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Stops the ongoing recording and updates the UI state with the recorded audio.
+     */
     fun stopRecording() {
         if (!_uiState.value.isRecording) return
+
         viewModelScope.launch {
             val audio = recordAudioUseCase.stop()
             _uiState.update { old ->
@@ -90,8 +110,11 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Reduces noise in the recorded audio.
+     */
     fun reduceNoise() {
-        // try to reduce the noise in live recording
+        // Optionally reduce noise in live recording.
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
             val newAudio = reduceNoiseUseCase(audio)
@@ -101,12 +124,17 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    fun playAudio(playAudio: Boolean) {
+    /**
+     * Toggles audio playback.
+     *
+     * @param shouldPlay When true, starts playback; when false, pauses playback.
+     */
+    fun togglePlayback(shouldPlay: Boolean) {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
-            playBackUseCase(audio, playAudio)
+            playBackUseCase(audio, shouldPlay)
 
-            if (playAudio) {
+            if (shouldPlay) {
                 startPollingPlaybackPosition()
                 _uiState.update { it.copy(isPlaying = true) }
             } else {
@@ -116,20 +144,25 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-    fun playRecording(rec: Recording, playAudio: Boolean = true) {
-        // Convert domain 'Recording' to 'AudioEntity'
+    /**
+     * Starts playback of a selected recording.
+     *
+     * Converts a [Recording] domain object to an [AudioEntity] before playback.
+     */
+    fun playRecording(rec: Recording, shouldPlay: Boolean = true) {
         val audioEntity = AudioEntity(
             filePath = rec.filePath,
             durationMillis = rec.durationMillis
         )
-        // Set the recordedAudio as this item
+        // Update the current recorded audio.
         _uiState.update { it.copy(recordedAudio = audioEntity) }
-
-        // Now just call our existing 'playAudio(true)'
-        playAudio(playAudio)
+        // Delegate to togglePlayback.
+        togglePlayback(shouldPlay)
     }
 
-
+    /**
+     * Deletes the current recorded audio if present.
+     */
     fun deleteAudio() {
         val audio = _uiState.value.recordedAudio ?: return
         viewModelScope.launch {
@@ -142,7 +175,9 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
-
+    /**
+     * Deletes a specific recording.
+     */
     fun deleteRecording(rec: Recording) {
         val audioEntity = AudioEntity(
             filePath = rec.filePath,
@@ -150,18 +185,17 @@ class RecordingViewModel @Inject constructor(
         )
         viewModelScope.launch {
             val success = deleteAudioUseCase(audioEntity)
-            if (success) {
-                // If the currently active 'recordedAudio' matches this, clear it
-                if (_uiState.value.recordedAudio?.filePath == rec.filePath) {
-                    _uiState.update { old ->
-                        old.copy(recordedAudio = null, isPlaying = false)
-                    }
+            if (success && _uiState.value.recordedAudio?.filePath == rec.filePath) {
+                _uiState.update { old ->
+                    old.copy(recordedAudio = null, isPlaying = false)
                 }
             }
         }
     }
 
-
+    /**
+     * Periodically polls for the current playback position and updates the UI state.
+     */
     private fun startPollingPlaybackPosition() {
         playbackJob?.cancel()
         playbackJob = viewModelScope.launch(Dispatchers.IO) {
@@ -181,8 +215,28 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Stops polling for the playback position.
+     */
     private fun stopPollingPlaybackPosition() {
         playbackJob?.cancel()
         playbackJob = null
+    }
+
+
+    /**
+     * Saves the recorded audio using the provided file name.
+     * This delegates to the [SaveRecordingUseCase] which renames the file and updates the database.
+     */
+    fun saveRecording(fileName: String) {
+        val audio = _uiState.value.recordedAudio ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val updatedAudio = saveRecordingUseCase(audio, fileName)
+            if (updatedAudio != null) {
+                _uiState.update { old -> old.copy(recordedAudio = updatedAudio) }
+            } else {
+                // Optionally update the UI state with an error message.
+            }
+        }
     }
 }
